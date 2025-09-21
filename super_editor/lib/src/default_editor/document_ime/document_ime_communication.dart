@@ -276,6 +276,7 @@ class DocumentImeInputClient extends TextInputConnectionDecorator with TextInput
 
     editorImeLog.fine("[DocumentImeInputClient] - Sending IME serialization:");
     editorImeLog.fine("[DocumentImeInputClient] - $textEditingValue");
+    print("Setting text editing value: $textEditingValue");
     setEditingState(textEditingValue);
     editorImeLog.fine("[DocumentImeInputClient] - Done sending document to IME");
 

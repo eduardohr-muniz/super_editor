@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:super_editor/src/core/document.dart';
 import 'package:super_editor/src/core/document_selection.dart';
 import 'package:super_editor/src/default_editor/layout_single_column/column_component.dart';
+import 'package:super_editor/src/default_editor/layout_single_column/composite_nodes.dart';
 import 'package:super_editor/src/default_editor/selection_upstream_downstream.dart';
 import 'package:super_editor/src/default_editor/text.dart';
 import 'package:super_editor/src/infrastructure/_logging.dart';
@@ -87,12 +88,12 @@ class DocumentImeSerializer {
       // so we might want an interface for ImeSerializable. If that's implemented, we call it,
       // and if it's not implemented, we do the "~" block representation.
       if (node is! TextNode) {
-        buffer.write('~');
-        characterCount += 1;
-
-        final imeRange = TextRange(start: characterCount - 1, end: characterCount);
+        final imeRange = TextRange(start: characterCount, end: characterCount + 1);
         imeRangesToDocTextNodes[imeRange] = node.id;
         docTextNodesToImeRanges[node.id] = imeRange;
+
+        buffer.write('~');
+        characterCount += 1;
 
         continue;
       }

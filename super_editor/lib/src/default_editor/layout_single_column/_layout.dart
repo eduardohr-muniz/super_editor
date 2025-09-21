@@ -208,7 +208,6 @@ class _SingleColumnDocumentLayoutState extends State<SingleColumnDocumentLayout>
     }
 
     final componentKey = _topToBottomComponentKeys.first;
-    print("_isAboveStartOfContent - key: $componentKey");
     final componentBox = componentKey.currentContext!.findRenderObject() as RenderBox;
     final offsetAtComponent = _componentOffset(componentBox, documentOffset);
 
@@ -406,7 +405,6 @@ class _SingleColumnDocumentLayoutState extends State<SingleColumnDocumentLayout>
       final componentOverlap = _getLocalOverlapWithComponent(region, component);
 
       if (componentOverlap != null) {
-        print("Found overlapping component (index $i): $componentOverlap");
         editorLayoutLog.fine(' - drag intersects: $componentKey}');
         editorLayoutLog.fine(' - intersection: $componentOverlap');
         final componentBaseOffset = _componentOffset(
@@ -424,7 +422,6 @@ class _SingleColumnDocumentLayoutState extends State<SingleColumnDocumentLayout>
           // Because we're iterating through components from top to bottom, the
           // first intersecting component that we find must be the top node of
           // the selected area.
-          print("This is the top node ($i)");
           topNodeId = _componentKeysToNodeIds[componentKey];
           topNodeBasePosition = _getNodePositionForComponentOffset(component, componentBaseOffset);
           topNodeExtentPosition = _getNodePositionForComponentOffset(component, componentExtentOffset);
@@ -433,7 +430,6 @@ class _SingleColumnDocumentLayoutState extends State<SingleColumnDocumentLayout>
         // intersection that we find. This way, when the iteration ends,
         // the last bottom node that we assigned must be the actual bottom
         // node within the selected area.
-        print("Updating bottom node with component $i position");
         bottomNodeId = _componentKeysToNodeIds[componentKey];
         bottomNodeBasePosition = _getNodePositionForComponentOffset(component, componentBaseOffset);
         bottomNodeExtentPosition = _getNodePositionForComponentOffset(component, componentExtentOffset);

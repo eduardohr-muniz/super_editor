@@ -1,5 +1,6 @@
 import 'package:flutter/painting.dart';
 import 'package:super_editor/src/core/styles.dart';
+import 'package:super_editor/src/default_editor/layout_single_column/composite_nodes.dart';
 
 import '../../core/document.dart';
 import '_presenter.dart';
@@ -39,6 +40,7 @@ class SingleColumnStylesheetStyler extends SingleColumnLayoutStylePhase {
           _styleComponent(
             document,
             document.getNodeById(componentViewModel.nodeId)!,
+            null,
             componentViewModel.copy(),
           ),
       ],
@@ -48,8 +50,11 @@ class SingleColumnStylesheetStyler extends SingleColumnLayoutStylePhase {
   SingleColumnLayoutComponentViewModel _styleComponent(
     Document document,
     DocumentNode node,
+    DocumentNode? parent,
     SingleColumnLayoutComponentViewModel viewModel,
   ) {
+    print("_styleComponent() - node: $node, viewModel: $viewModel");
+
     // Combine all applicable style rules into a single set of styles
     // for this component.
     final aggregateStyles = <String, dynamic>{
@@ -57,7 +62,7 @@ class SingleColumnStylesheetStyler extends SingleColumnLayoutStylePhase {
       Styles.inlineWidgetBuilders: _stylesheet.inlineWidgetBuilders,
     };
     for (final rule in _stylesheet.rules) {
-      if (rule.selector.matches(document, node)) {
+      if (rule.selector.matches(document, node, parent)) {
         _mergeStyles(
           existingStyles: aggregateStyles,
           newStyles: rule.styler(document, node),
@@ -66,6 +71,14 @@ class SingleColumnStylesheetStyler extends SingleColumnLayoutStylePhase {
     }
 
     viewModel.applyStyles(aggregateStyles);
+
+    if (node is CompositeNode && viewModel is CompositeNodeViewModel) {
+      print(" - this is a composite node. Styling recursively.");
+      for (int i = 0; i < node.children.length; i += 1) {
+        print(" - styling sub-view model: ${viewModel.children[i]}");
+        _styleComponent(document, node.getChildAt(i), node, viewModel.children[i]);
+      }
+    }
 
     return viewModel;
   }

@@ -160,9 +160,6 @@ class ParagraphComponentBuilder implements ComponentBuilder {
       editorLayoutLog.finer(' - not painting any text selection');
     }
 
-    print(
-        "Building a ParagraphComponent (ID: ${componentViewModel.nodeId}) with component key: ${componentContext.componentKey}");
-
     return ParagraphComponent(
       key: componentContext.componentKey,
       viewModel: componentViewModel,

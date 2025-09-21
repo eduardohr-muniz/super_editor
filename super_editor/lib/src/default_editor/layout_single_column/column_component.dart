@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:super_editor/src/core/document.dart';
 import 'package:super_editor/src/core/document_layout.dart';
+import 'package:super_editor/src/default_editor/layout_single_column/composite_nodes.dart';
+import 'package:super_editor/src/infrastructure/flutter/geometry.dart';
 
 /// A [DocumentComponent] that presents other components, within a column.
 class ColumnDocumentComponent extends StatefulWidget {
@@ -36,8 +38,16 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
   }
 
   @override
+  NodePosition getBeginningPositionNearX(double x) {
+    return CompositeNodePosition(
+      // TODO: We're using ad hoc component IDs based on child index. Come up with robust solution.
+      "0",
+      widget.childComponentKeys.first.currentState!.getBeginningPositionNearX(x),
+    );
+  }
+
+  @override
   NodePosition getEndPosition() {
-    print("getEndPosition() - key: ${widget.childComponentKeys.last}");
     return CompositeNodePosition(
       // TODO: We're using ad hoc component IDs based on child index. Come up with robust solution.
       "${widget.children.length - 1}",
@@ -47,21 +57,18 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
   }
 
   @override
-  NodePosition getBeginningPositionNearX(double x) {
-    return widget.childComponentKeys.first.currentState!.getBeginningPositionNearX(x);
-  }
-
-  @override
   NodePosition getEndPositionNearX(double x) {
-    return widget.childComponentKeys.last.currentState!.getEndPositionNearX(x);
+    return CompositeNodePosition(
+      // TODO: We're using ad hoc component IDs based on child index. Come up with robust solution.
+      "${widget.children.length - 1}",
+      widget.childComponentKeys.last.currentState!.getEndPositionNearX(x),
+    );
   }
 
   @override
   MouseCursor? getDesiredCursorAtOffset(Offset localOffset) {
-    print("getDesiredCursorAtOffset() - local offset: $localOffset");
     final childIndexNearestToOffset = _getIndexOfChildNearestTo(localOffset);
     final childOffset = _projectColumnOffsetToChildSpace(localOffset, childIndexNearestToOffset);
-    print(" - offset in child ($childIndexNearestToOffset): $childOffset");
 
     return widget.childComponentKeys[childIndexNearestToOffset].currentState!.getDesiredCursorAtOffset(childOffset);
   }
@@ -70,7 +77,6 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
   NodePosition? getPositionAtOffset(Offset localOffset) {
     // TODO: Change all implementations of getPositionAtOffset to be exact, not nearest - but this first
     //       requires updating the gesture offset lookups.
-    print("Column component - getPositionAtOffset() - local offset: $localOffset");
     if (localOffset.dy < 0) {
       return CompositeNodePosition(
         // TODO: use real IDs, not just index.
@@ -91,7 +97,6 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
     final childIndex = _getIndexOfChildNearestTo(localOffset);
     final childOffset = _projectColumnOffsetToChildSpace(localOffset, childIndex);
 
-    print(" - Returning position at offset for child $childIndex, at child offset: $childOffset");
     return CompositeNodePosition(
       // TODO: use real IDs, not just index.
       "$childIndex",
@@ -106,7 +111,15 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
           "Tried get edge near position within a ColumnDocumentComponent with invalid type of node position: $nodePosition");
     }
 
-    return _getChildComponentAtPosition(nodePosition).getEdgeForPosition(nodePosition.childNodePosition);
+    final rectInChild = _getChildComponentAtPosition(nodePosition).getEdgeForPosition(nodePosition.childNodePosition);
+    final childIndex = _findChildIndexForPosition(nodePosition);
+
+    final rectInColumn = Rect.fromPoints(
+      _projectChildOffsetToColumnSpace(rectInChild.topLeft, childIndex),
+      _projectChildOffsetToColumnSpace(rectInChild.bottomRight, childIndex),
+    );
+
+    return rectInColumn;
   }
 
   @override
@@ -127,9 +140,19 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
           "Tried get bounding rectangle for position within a ColumnDocumentComponent with invalid type of node position: $nodePosition");
     }
 
-    return _getChildComponentAtIndex(
+    final childComponent = _getChildComponentAtIndex(
       _findChildIndexForPosition(nodePosition),
-    ).getRectForPosition(nodePosition.childNodePosition);
+    );
+    final childRenderBox = childComponent.context.findRenderObject() as RenderBox;
+
+    final rectInChild = childComponent.getRectForPosition(nodePosition.childNodePosition);
+
+    final childOffsetInColumn =
+        (childComponent.context.findRenderObject() as RenderBox).localToGlobal(Offset.zero, ancestor: _columnBox);
+
+    final rectInColumn = rectInChild.translateByOffset(childOffsetInColumn);
+
+    return rectInColumn;
   }
 
   @override
@@ -429,6 +452,16 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
     return _getChildBoxAtIndex(childIndex).globalToLocal(columnOffset, ancestor: _columnBox);
   }
 
+  /// Given an offset that's relative to a child in this column, finds and returns where that
+  /// same point sits relative to the column origin.
+  Offset _projectChildOffsetToColumnSpace(Offset childOffset, int childIndex) {
+    final childComponent = _getChildComponentAtIndex(childIndex);
+    final childRenderBox = childComponent.context.findRenderObject() as RenderBox;
+    final childOffsetInColumn = childRenderBox.localToGlobal(childOffset, ancestor: _columnBox);
+
+    return childOffsetInColumn;
+  }
+
   RenderBox get _columnBox => context.findRenderObject() as RenderBox;
 
   RenderBox _getChildBoxAtIndex(int childIndex) {
@@ -437,8 +470,8 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
 
   @override
   Widget build(BuildContext context) {
-    print("Composite component children: ${widget.children}");
-    print("Child component keys: ${widget.childComponentKeys}");
+    // print("Composite component children: ${widget.children}");
+    // print("Child component keys: ${widget.childComponentKeys}");
 
     return IgnorePointer(
       child: Column(
@@ -446,34 +479,4 @@ class _ColumnDocumentComponentState extends State<ColumnDocumentComponent>
       ),
     );
   }
-}
-
-class CompositeNodePosition implements NodePosition {
-  const CompositeNodePosition(this.childNodeId, this.childNodePosition);
-
-  final String childNodeId;
-  final NodePosition childNodePosition;
-
-  CompositeNodePosition moveWithinChild(NodePosition newPosition) {
-    return CompositeNodePosition(childNodeId, newPosition);
-  }
-
-  @override
-  bool isEquivalentTo(NodePosition other) {
-    return this == other;
-  }
-
-  @override
-  String toString() => "[CompositeNodePosition] - $childNodeId -> $childNodePosition";
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CompositeNodePosition &&
-          runtimeType == other.runtimeType &&
-          childNodeId == other.childNodeId &&
-          childNodePosition == other.childNodePosition;
-
-  @override
-  int get hashCode => childNodeId.hashCode ^ childNodePosition.hashCode;
 }

@@ -10,7 +10,7 @@ void main() {
 }
 
 class _ComponentsInComponentsDemoScreen extends StatefulWidget {
-  const _ComponentsInComponentsDemoScreen({super.key});
+  const _ComponentsInComponentsDemoScreen();
 
   @override
   State<_ComponentsInComponentsDemoScreen> createState() => _ComponentsInComponentsDemoScreenState();
@@ -38,16 +38,23 @@ class _ComponentsInComponentsDemoScreenState extends State<_ComponentsInComponen
               id: "3",
               text: AttributedText("Hello, Banner!"),
               metadata: {
-                NodeMetadata.blockType: header1Attribution,
+                NodeMetadata.blockType: header2Attribution,
               },
             ),
-            ParagraphNode(
+            HorizontalRuleNode(id: "7"),
+            ImageNode(
               id: "4",
+              imageUrl:
+                  "https://www.thedroidsonroids.com/wp-content/uploads/2023/08/flutter_blog_series_What-is-Flutter-app-development-.png",
+            ),
+            HorizontalRuleNode(id: "8"),
+            ParagraphNode(
+              id: "5",
               text: AttributedText("This is a banner, which can contain any other blocks you want"),
             ),
           ]),
           ParagraphNode(
-            id: "5",
+            id: "6",
             text: AttributedText("This is after the banner component."),
           ),
         ],
@@ -67,6 +74,37 @@ class _ComponentsInComponentsDemoScreenState extends State<_ComponentsInComponen
     return Scaffold(
       body: SuperEditor(
         editor: _editor,
+        stylesheet: defaultStylesheet.copyWith(
+          addRulesAfter: [
+            StyleRule(
+              BlockSelector("banner"),
+              (doc, docNode) {
+                return {
+                  Styles.padding: CascadingPadding.only(left: 0, right: 0, top: 24, bottom: 0),
+                };
+              },
+            ),
+            StyleRule(
+              BlockSelector.all.childOf("banner"),
+              (doc, docNode) {
+                return {
+                  Styles.padding: CascadingPadding.symmetric(vertical: 0, horizontal: 0),
+                  Styles.textStyle: const TextStyle(
+                    color: Colors.white,
+                  ),
+                };
+              },
+            ),
+            StyleRule(
+              BlockSelector(horizontalRuleBlockType.name).childOf("banner"),
+              (doc, docNode) {
+                return {
+                  Styles.backgroundColor: Colors.white.withValues(alpha: 0.25),
+                };
+              },
+            ),
+          ],
+        ),
         componentBuilders: [
           _BannerComponentBuilder(),
           ...defaultComponentBuilders,
@@ -76,116 +114,7 @@ class _ComponentsInComponentsDemoScreenState extends State<_ComponentsInComponen
   }
 }
 
-class _BannerNode extends DocumentNode {
-  _BannerNode({
-    required this.id,
-    required this.children,
-  });
-
-  @override
-  final String id;
-
-  final List<DocumentNode> children;
-
-  @override
-  NodePosition get beginningPosition => CompositeNodePosition(
-        children.first.id,
-        children.first.beginningPosition,
-      );
-
-  @override
-  NodePosition get endPosition => CompositeNodePosition(
-        children.last.id,
-        children.last.endPosition,
-      );
-
-  @override
-  bool containsPosition(Object position) {
-    if (position is! CompositeNodePosition) {
-      return false;
-    }
-
-    for (final child in children) {
-      if (child.id == position.childNodeId) {
-        return child.containsPosition(position.childNodePosition);
-      }
-    }
-
-    return false;
-  }
-
-  @override
-  NodePosition selectUpstreamPosition(NodePosition position1, NodePosition position2) {
-    if (position1 is! CompositeNodePosition) {
-      throw Exception('Expected a _CompositeNodePosition for position1 but received a ${position1.runtimeType}');
-    }
-    if (position2 is! CompositeNodePosition) {
-      throw Exception('Expected a _CompositeNodePosition for position2 but received a ${position2.runtimeType}');
-    }
-
-    final index1 = int.parse(position1.childNodeId);
-    final index2 = int.parse(position2.childNodeId);
-
-    if (index1 == index2) {
-      return position1.childNodePosition ==
-              children[index1].selectUpstreamPosition(position1.childNodePosition, position2.childNodePosition)
-          ? position1
-          : position2;
-    }
-
-    return index1 < index2 ? position1 : position2;
-  }
-
-  @override
-  NodePosition selectDownstreamPosition(NodePosition position1, NodePosition position2) {
-    final upstream = selectUpstreamPosition(position1, position2);
-    return upstream == position1 ? position2 : position1;
-  }
-
-  @override
-  NodeSelection computeSelection({required NodePosition base, required NodePosition extent}) {
-    assert(base is CompositeNodePosition);
-    assert(extent is CompositeNodePosition);
-
-    return BannerNodeSelection(
-      base: base as CompositeNodePosition,
-      extent: extent as CompositeNodePosition,
-    );
-  }
-
-  @override
-  DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) {
-    // TODO: implement copyWithAddedMetadata
-    throw UnimplementedError();
-  }
-
-  @override
-  DocumentNode copyAndReplaceMetadata(Map<String, dynamic> newMetadata) {
-    // TODO: implement copyAndReplaceMetadata
-    throw UnimplementedError();
-  }
-
-  @override
-  String? copyContent(NodeSelection selection) {
-    // TODO: implement copyContent
-    throw UnimplementedError();
-  }
-}
-
-class BannerNodeSelection implements NodeSelection {
-  const BannerNodeSelection.collapsed(CompositeNodePosition position)
-      : base = position,
-        extent = position;
-
-  const BannerNodeSelection({
-    required this.base,
-    required this.extent,
-  });
-
-  final CompositeNodePosition base;
-
-  final CompositeNodePosition extent;
-}
+const bannerBlockType = NamedAttribution("banner");
 
 class _BannerComponentBuilder implements ComponentBuilder {
   @override
@@ -198,7 +127,7 @@ class _BannerComponentBuilder implements ComponentBuilder {
       return null;
     }
 
-    return _BannerViewModel(
+    return CompositeNodeViewModel(
       nodeId: node.id,
       children: node.children.map((childNode) => presenterContext.createViewModel(childNode)!).toList(),
     );
@@ -209,7 +138,7 @@ class _BannerComponentBuilder implements ComponentBuilder {
     SingleColumnDocumentComponentContext componentContext,
     SingleColumnLayoutComponentViewModel componentViewModel,
   ) {
-    if (componentViewModel is! _BannerViewModel) {
+    if (componentViewModel is! CompositeNodeViewModel) {
       return null;
     }
 
@@ -219,8 +148,8 @@ class _BannerComponentBuilder implements ComponentBuilder {
         )
         .toList(growable: false);
 
-    print("Building a _BannerComponent - banner key: ${componentContext.componentKey}");
-    print(" - child keys: ${childrenAndKeys.map((x) => x.$1)}");
+    // print("Building a _BannerComponent - banner key: ${componentContext.componentKey}");
+    // print(" - child keys: ${childrenAndKeys.map((x) => x.$1)}");
     return _BannerComponent(
       key: componentContext.componentKey,
       // childComponentIds: [],
@@ -229,29 +158,6 @@ class _BannerComponentBuilder implements ComponentBuilder {
         for (final child in childrenAndKeys) //
           child.$2,
       ],
-    );
-  }
-}
-
-class _BannerViewModel extends SingleColumnLayoutComponentViewModel {
-  _BannerViewModel({
-    required super.nodeId,
-    super.createdAt,
-    super.padding = EdgeInsets.zero,
-    super.maxWidth,
-    required this.children,
-  });
-
-  final List<SingleColumnLayoutComponentViewModel> children;
-
-  @override
-  SingleColumnLayoutComponentViewModel copy() {
-    return _BannerViewModel(
-      nodeId: nodeId,
-      createdAt: createdAt,
-      padding: padding,
-      maxWidth: maxWidth,
-      children: List.from(children),
     );
   }
 }
@@ -295,5 +201,39 @@ class _BannerComponentState extends State<_BannerComponent> with ProxyDocumentCo
         ),
       ),
     );
+  }
+}
+
+class _BannerNode extends CompositeNode {
+  _BannerNode({
+    required super.id,
+    required this.children,
+    Map<String, dynamic>? metadata,
+  }) : super(
+          metadata: {
+            if (metadata != null) //
+              ...metadata,
+            NodeMetadata.blockType: bannerBlockType,
+          },
+        );
+
+  final List<DocumentNode> children;
+
+  @override
+  DocumentNode copyWithAddedMetadata(Map<String, dynamic> newProperties) {
+    // TODO: implement copyWithAddedMetadata
+    throw UnimplementedError();
+  }
+
+  @override
+  DocumentNode copyAndReplaceMetadata(Map<String, dynamic> newMetadata) {
+    // TODO: implement copyAndReplaceMetadata
+    throw UnimplementedError();
+  }
+
+  @override
+  String? copyContent(NodeSelection selection) {
+    // TODO: implement copyContent
+    throw UnimplementedError();
   }
 }
