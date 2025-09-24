@@ -1,3 +1,10 @@
+## [0.3.0-dev.34]
+### Sept 23, 2025
+* FIX: `MessagePageScaffold` fix its `Element` so that subtrees correctly activate and deactivate.
+* FIX: `KeyboardPanelScaffold` under certain conditions retained toolbar space when toolbar wasn't visible.
+* FIX: `KeyboardScaffoldSafeArea` handle possibility that the safe area content is below the bottom of the screen.
+* FIX: A couple places where `OverlayController.show()` are called were moved to post frame callbacks.
+
 ## [0.3.0-dev.33]
 ### Aug 27, 2025
 * ADJUSTMENT: Upgrade `attributed_text` dependency to `v0.4.5`. 
