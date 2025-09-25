@@ -862,6 +862,7 @@ class SuperEditorState extends State<SuperEditor> {
             editContext.commonOps,
             SuperEditorAndroidControlsScope.rootOf(context),
             editContext.composer.selectionNotifier,
+            focalPoint,
           ),
           child: child,
         );
@@ -1038,9 +1039,11 @@ Widget defaultAndroidEditorToolbarBuilder(
   CommonEditorOperations editorOps,
   SuperEditorAndroidControlsController editorControlsController,
   ValueListenable<DocumentSelection?> selectionNotifier,
+  LeaderLink focalPoint,
 ) {
   return DefaultAndroidEditorToolbar(
     floatingToolbarKey: floatingToolbarKey,
+    focalPoint: focalPoint,
     editorOps: editorOps,
     editorControlsController: editorControlsController,
     selectionNotifier: selectionNotifier,
@@ -1055,9 +1058,11 @@ class DefaultAndroidEditorToolbar extends StatelessWidget {
     required this.editorOps,
     required this.editorControlsController,
     required this.selectionNotifier,
+    required this.focalPoint,
   });
 
   final Key? floatingToolbarKey;
+  final LeaderLink focalPoint;
   final CommonEditorOperations editorOps;
   final SuperEditorAndroidControlsController editorControlsController;
   final ValueListenable<DocumentSelection?> selectionNotifier;
@@ -1069,6 +1074,7 @@ class DefaultAndroidEditorToolbar extends StatelessWidget {
       builder: (context, selection, child) {
         return AndroidTextEditingFloatingToolbar(
           floatingToolbarKey: floatingToolbarKey,
+          focalPoint: focalPoint,
           onCopyPressed: selection == null || !selection.isCollapsed //
               ? _copy
               : null,
