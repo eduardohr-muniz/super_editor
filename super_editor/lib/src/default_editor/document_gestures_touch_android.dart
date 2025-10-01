@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:follow_the_leader/follow_the_leader.dart';
+import 'package:overlord/follow_the_leader.dart';
 import 'package:super_editor/src/core/document.dart';
 import 'package:super_editor/src/core/document_composer.dart';
 import 'package:super_editor/src/core/document_layout.dart';
@@ -1435,9 +1436,8 @@ class SuperEditorAndroidControlsOverlayManagerState extends State<SuperEditorAnd
     super.didChangeDependencies();
 
     _controlsController = SuperEditorAndroidControlsScope.rootOf(context);
-    // TODO: Replace _AndroidPopoverToolbarAligner aligner with a generic aligner because this code runs on Android.
-    _toolbarAligner = _AndroidPopoverToolbarAligner(
-      boundsKey: _boundsKey,
+    // TODO: Replace CupertinoPopoverToolbarAligner aligner with a generic aligner because this code runs on Android.
+    _toolbarAligner = CupertinoPopoverToolbarAligner(
       toolbarVerticalOffsetAbove: 20,
       toolbarVerticalOffsetBelow: 90,
     );
@@ -1917,10 +1917,7 @@ class SuperEditorAndroidControlsOverlayManagerState extends State<SuperEditorAnd
       child: Follower.withAligner(
         link: _controlsController!.toolbarFocalPoint,
         aligner: _toolbarAligner,
-        boundary: ScreenFollowerBoundary(
-          screenSize: MediaQuery.sizeOf(context),
-          devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-        ),
+        boundary: const ScreenFollowerBoundary(),
         child: _toolbarBuilder(context, DocumentKeys.mobileToolbar, _controlsController!.toolbarFocalPoint),
       ),
     );
@@ -1985,10 +1982,7 @@ class SuperEditorAndroidControlsOverlayManagerState extends State<SuperEditorAnd
       offset: Offset(0, -54 * devicePixelRatio),
       leaderAnchor: Alignment.center,
       followerAnchor: Alignment.center,
-      boundary: ScreenFollowerBoundary(
-        screenSize: MediaQuery.sizeOf(context),
-        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-      ),
+      boundary: const ScreenFollowerBoundary(),
       child: AndroidMagnifyingGlass(
         key: magnifierKey,
         magnificationScale: 1.5,
@@ -2032,48 +2026,3 @@ enum SelectionBound {
   base,
   extent,
 }
-
-class _AndroidPopoverToolbarAligner implements FollowerAligner {
-  _AndroidPopoverToolbarAligner({
-    this.boundsKey,
-    this.toolbarVerticalOffsetAbove = 20,
-    this.toolbarVerticalOffsetBelow = 20,
-  });
-
-  final GlobalKey? boundsKey;
-  final double toolbarVerticalOffsetAbove;
-  final double toolbarVerticalOffsetBelow;
-
-  @override
-  FollowerAlignment align(Rect globalLeaderRect, Size followerSize) {
-    final boundsBox = boundsKey?.currentContext?.findRenderObject() as RenderBox?;
-    final bounds = boundsBox != null
-        ? Rect.fromPoints(
-            boundsBox.localToGlobal(Offset.zero),
-            boundsBox.localToGlobal(boundsBox.size.bottomRight(Offset.zero)),
-          )
-        : Rect.largest;
-
-    late FollowerAlignment alignment;
-    if (globalLeaderRect.top - followerSize.height - _popoverToolbarMinimumDistanceFromEdge < bounds.top) {
-      // The follower hit the minimum distance. Invert the follower position.
-      alignment = FollowerAlignment(
-        leaderAnchor: Alignment.bottomCenter,
-        followerAnchor: Alignment.topCenter,
-        followerOffset: Offset(0, toolbarVerticalOffsetBelow),
-      );
-    } else {
-      // There's enough room to display toolbar above content. That's our desired
-      // default position, so put the toolbar on top.
-      alignment = FollowerAlignment(
-        leaderAnchor: Alignment.topCenter,
-        followerAnchor: Alignment.bottomCenter,
-        followerOffset: Offset(0, -toolbarVerticalOffsetAbove),
-      );
-    }
-
-    return alignment;
-  }
-}
-
-const double _popoverToolbarMinimumDistanceFromEdge = 16;
