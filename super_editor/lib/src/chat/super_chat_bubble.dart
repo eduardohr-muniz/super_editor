@@ -6,7 +6,6 @@ import 'package:super_editor/src/core/document_interaction.dart';
 import 'package:super_editor/src/core/document_layout.dart';
 import 'package:super_editor/src/core/editor.dart';
 import 'package:super_editor/src/core/styles.dart';
-import 'package:super_editor/src/default_editor/document_scrollable.dart';
 import 'package:super_editor/src/default_editor/layout_single_column/_layout.dart';
 import 'package:super_editor/src/default_editor/layout_single_column/_presenter.dart';
 import 'package:super_editor/src/default_editor/layout_single_column/_styler_per_component.dart';
@@ -32,7 +31,6 @@ class SuperChatBubble extends StatefulWidget {
   SuperChatBubble({
     Key? key,
     this.focusNode,
-    this.autofocus = false,
     this.tapRegionGroupId,
     required this.editor,
     this.documentLayoutKey,
@@ -60,9 +58,6 @@ class SuperChatBubble extends StatefulWidget {
         super(key: key);
 
   final FocusNode? focusNode;
-
-  /// Whether or not the [SuperChatBubble] should autofocus.
-  final bool autofocus;
 
   /// {@macro super_reader_tap_region_group_id}
   final String? tapRegionGroupId;
@@ -182,14 +177,6 @@ class _SuperChatBubbleState extends State<SuperChatBubble> {
 
   ContentTapDelegate? _contentTapDelegate;
 
-  // Although this widget does not scroll itself, the inner `ReadOnlyDocumentMouseInteractor`
-  // requires an `AutoScrollController`.
-  final AutoScrollController _autoScrollController = AutoScrollController();
-
-  // Although this widget does not scroll itself, the inner `ReadOnlyAndroidDocumentTouchInteractor`
-  // and `SuperReaderIosDocumentTouchInteractor` require a scroll controller.
-  final ScrollController _scrollController = ScrollController();
-
   late SuperReaderContext _readerContext;
 
   @visibleForTesting
@@ -246,9 +233,6 @@ class _SuperChatBubbleState extends State<SuperChatBubble> {
       // We are using our own private FocusNode. Dispose it.
       _focusNode.dispose();
     }
-
-    _autoScrollController.dispose();
-    _scrollController.dispose();
 
     super.dispose();
   }
@@ -337,7 +321,6 @@ class _SuperChatBubbleState extends State<SuperChatBubble> {
               focusNode: _focusNode,
               readerContext: _readerContext,
               keyboardActions: widget.keyboardActions,
-              autofocus: widget.autofocus,
               child: _buildGestureInteractor(
                 child: _buildPlatformSpecificViewportDecorations(
                   child: _buildDocumentLayout(),
@@ -412,7 +395,6 @@ class _SuperChatBubbleState extends State<SuperChatBubble> {
           focusNode: _focusNode,
           readerContext: _readerContext,
           contentTapHandler: _contentTapDelegate,
-          autoScroller: _autoScrollController,
           fillViewport: fillViewport,
           showDebugPaint: widget.debugPaint.gestures,
           child: child,
@@ -426,7 +408,6 @@ class _SuperChatBubbleState extends State<SuperChatBubble> {
           getDocumentLayout: () => _readerContext.documentLayout,
           selectionLinks: _selectionLinks,
           contentTapHandler: _contentTapDelegate,
-          scrollController: _scrollController,
           handleColor: widget.androidHandleColor ?? Theme.of(context).primaryColor,
           popoverToolbarBuilder: widget.androidToolbarBuilder ?? (_) => const SizedBox(),
           createOverlayControlsClipper: widget.createOverlayControlsClipper,
@@ -442,7 +423,6 @@ class _SuperChatBubbleState extends State<SuperChatBubble> {
           documentKey: _docLayoutKey,
           getDocumentLayout: () => _readerContext.documentLayout,
           contentTapHandler: _contentTapDelegate,
-          scrollController: _scrollController,
           fillViewport: fillViewport,
           showDebugPaint: widget.debugPaint.gestures,
           child: child,
