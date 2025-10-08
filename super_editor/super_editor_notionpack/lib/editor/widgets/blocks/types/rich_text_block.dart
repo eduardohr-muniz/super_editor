@@ -179,7 +179,22 @@ class _RichTextBlockState extends State<RichTextBlock> {
     // Position toolbar above the text field
     final toolbarPosition = Offset(textFieldPosition.dx + textFieldSize.width / 2, textFieldPosition.dy - 60);
 
-    return Positioned(left: toolbarPosition.dx, top: toolbarPosition.dy, child: FractionalTranslation(translation: const Offset(-0.5, 0), child: _buildToolbar()));
+    return Stack(
+      children: [
+        // Invisible background to detect clicks outside toolbar
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () {
+              _hideFormattingToolbar();
+              setState(() => _showToolbar = false);
+            },
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+        // Toolbar
+        Positioned(left: toolbarPosition.dx, top: toolbarPosition.dy, child: FractionalTranslation(translation: const Offset(-0.5, 0), child: _buildToolbar())),
+      ],
+    );
   }
 
   Widget _buildToolbar() {
@@ -238,28 +253,44 @@ class _RichTextBlockState extends State<RichTextBlock> {
 
   void _toggleBold() {
     _textController.toggleSelectionAttributions([boldAttribution]);
+    _hideFormattingToolbar();
+    setState(() => _showToolbar = false);
   }
 
   void _toggleItalic() {
     _textController.toggleSelectionAttributions([italicsAttribution]);
+    _hideFormattingToolbar();
+    setState(() => _showToolbar = false);
   }
 
   void _toggleUnderline() {
     _textController.toggleSelectionAttributions([underlineAttribution]);
+    _hideFormattingToolbar();
+    setState(() => _showToolbar = false);
   }
 
   void _toggleStrikethrough() {
     _textController.toggleSelectionAttributions([strikethroughAttribution]);
+    _hideFormattingToolbar();
+    setState(() => _showToolbar = false);
   }
 
   void _applyColor(Color color) {
     // Update the block's text color (will trigger rebuild with new TextStyle)
     widget.onBlockUpdated(widget.block.copyWith(textColor: color));
+
+    // Close toolbar after applying color
+    _hideFormattingToolbar();
+    setState(() => _showToolbar = false);
   }
 
   void _addLink() {
     final selection = _textController.selection;
     if (selection.isCollapsed) return;
+
+    // Close toolbar first
+    _hideFormattingToolbar();
+    setState(() => _showToolbar = false);
 
     // Show dialog to ask for URL
     showDialog(
