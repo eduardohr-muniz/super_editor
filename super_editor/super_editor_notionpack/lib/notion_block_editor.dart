@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:super_editor_notionpack/widgets/block_menu.dart';
 
 /// A true Notion-style block editor with reorderable blocks
@@ -17,10 +18,40 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
   int? _menuForBlockIndex;
   bool _isSlashCommand = false;
 
+  // Controllers and focus nodes for each block
+  final Map<String, TextEditingController> _controllers = {};
+  final Map<String, FocusNode> _focusNodes = {};
+
   @override
   void initState() {
     super.initState();
     _initializeBlocks();
+  }
+
+  @override
+  void dispose() {
+    // Dispose all controllers and focus nodes
+    for (var controller in _controllers.values) {
+      controller.dispose();
+    }
+    for (var focusNode in _focusNodes.values) {
+      focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _getController(EditorBlock block) {
+    if (!_controllers.containsKey(block.id)) {
+      _controllers[block.id] = TextEditingController(text: block.content);
+    }
+    return _controllers[block.id]!;
+  }
+
+  FocusNode _getFocusNode(EditorBlock block) {
+    if (!_focusNodes.containsKey(block.id)) {
+      _focusNodes[block.id] = FocusNode();
+    }
+    return _focusNodes[block.id]!;
   }
 
   void _initializeBlocks() {
@@ -42,9 +73,14 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
   }
 
   void _convertBlock(int index, BlockType newType) {
+    final block = _blocks[index];
     setState(() {
-      final block = _blocks[index];
       _blocks[index] = EditorBlock(id: block.id, type: newType, content: block.content);
+    });
+
+    // Focus the block after conversion
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _getFocusNode(block).requestFocus();
     });
   }
 
@@ -59,70 +95,64 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        if (_showBlockMenu) {
-          setState(() => _showBlockMenu = false);
-        }
-      },
-      child: Stack(
-        children: [
-          Container(
-            color: Colors.white,
-            child: ReorderableListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 40),
-              itemCount: _blocks.length,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (newIndex > oldIndex) newIndex--;
-                  final block = _blocks.removeAt(oldIndex);
-                  _blocks.insert(newIndex, block);
-                });
-              },
-              proxyDecorator: (child, index, animation) {
-                return Material(elevation: 6, borderRadius: BorderRadius.circular(8), child: child);
-              },
-              buildDefaultDragHandles: false,
-              itemBuilder: (context, index) {
-                final block = _blocks[index];
-                return _buildBlock(context, block, index);
-              },
-            ),
+    return Stack(
+      children: [
+        Container(
+          color: Colors.white,
+          child: ReorderableListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 40),
+            itemCount: _blocks.length,
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                if (newIndex > oldIndex) newIndex--;
+                final block = _blocks.removeAt(oldIndex);
+                _blocks.insert(newIndex, block);
+              });
+            },
+            proxyDecorator: (child, index, animation) {
+              return Material(elevation: 6, borderRadius: BorderRadius.circular(8), child: child);
+            },
+            buildDefaultDragHandles: false,
+            itemBuilder: (context, index) {
+              final block = _blocks[index];
+              return _buildBlock(context, block, index);
+            },
           ),
-          if (_showBlockMenu && _menuForBlockIndex != null)
-            Positioned(
-              left: _blockMenuPosition.dx,
-              top: _blockMenuPosition.dy,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: 320,
-                  constraints: const BoxConstraints(maxHeight: 400),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Padding(padding: const EdgeInsets.all(12), child: Text('Select block type', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-                      Divider(height: 1),
-                      Flexible(
-                        child: ListView(
-                          shrinkWrap: true,
-                          padding: EdgeInsets.symmetric(vertical: 4),
-                          children:
-                              blockMenuOptions.map((option) {
-                                return ListTile(
-                                  dense: true,
-                                  leading: Icon(option.icon, size: 20),
-                                  title: Text(option.title, style: TextStyle(fontSize: 14)),
-                                  subtitle: Text(option.description, style: TextStyle(fontSize: 12)),
-                                  onTap: () {
-                                    final type = _blockTypeFromMenuOption(option);
+        ),
+        if (_showBlockMenu && _menuForBlockIndex != null)
+          GestureDetector(
+            onTap: () {
+              setState(() => _showBlockMenu = false);
+            },
+            child: Container(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: _blockMenuPosition.dx,
+                    top: _blockMenuPosition.dy,
+                    child: GestureDetector(
+                      onTap: () {}, // Prevent clicks inside menu from closing it
+                      child: Material(
+                        elevation: 8,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: 320,
+                          constraints: const BoxConstraints(maxHeight: 450),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Padding(padding: const EdgeInsets.all(12), child: Text('Select block type', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+                              Divider(height: 1),
+                              Flexible(
+                                child: _BlockMenuList(
+                                  menuForBlockIndex: _menuForBlockIndex!,
+                                  isSlashCommand: _isSlashCommand,
+                                  onBlockSelected: (type) {
                                     if (_isSlashCommand) {
-                                      // Convert current block
                                       _convertBlock(_menuForBlockIndex!, type);
                                     } else {
-                                      // Add new block after current
                                       _addBlock(type, _menuForBlockIndex!);
                                     }
                                     setState(() {
@@ -130,49 +160,20 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
                                       _isSlashCommand = false;
                                     });
                                   },
-                                );
-                              }).toList(),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
-  }
-
-  BlockType _blockTypeFromMenuOption(BlockMenuOption option) {
-    switch (option.id) {
-      case 'heading1':
-        return BlockType.heading1;
-      case 'heading2':
-        return BlockType.heading2;
-      case 'heading3':
-        return BlockType.heading3;
-      case 'bullet-list':
-        return BlockType.bulletList;
-      case 'numbered-list':
-        return BlockType.numberedList;
-      case 'quote':
-        return BlockType.quote;
-      case 'callout-info':
-        return BlockType.calloutInfo;
-      case 'callout-warning':
-        return BlockType.calloutWarning;
-      case 'callout-error':
-        return BlockType.calloutError;
-      case 'callout-success':
-        return BlockType.calloutSuccess;
-      case 'toggle':
-        return BlockType.toggle;
-      case 'divider':
-        return BlockType.divider;
-      default:
-        return BlockType.paragraph;
-    }
   }
 
   Widget _buildBlock(BuildContext context, EditorBlock block, int index) {
@@ -202,11 +203,8 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
                       builder:
                           (context) => InkWell(
                             onTap: () {
-                              final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
-                              if (renderBox != null && renderBox.hasSize) {
-                                final position = renderBox.localToGlobal(Offset.zero);
-                                _showMenuForBlock(index, Offset(position.dx + 60, position.dy));
-                              }
+                              // Use a fixed position relative to the screen
+                              _showMenuForBlock(index, Offset(120, 100 + (index * 50.0).clamp(0, 300)));
                             },
                             borderRadius: BorderRadius.circular(4),
                             child: SizedBox(width: 24, height: 24, child: Icon(Icons.add, size: 16, color: Colors.grey.shade600)),
@@ -225,10 +223,18 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
   }
 
   Widget _buildBlockContent(EditorBlock block, int index) {
-    final controller = TextEditingController(text: block.content);
+    final controller = _getController(block);
+    final focusNode = _getFocusNode(block);
+
+    // Update controller if block content changed externally
+    if (controller.text != block.content) {
+      controller.text = block.content;
+      controller.selection = TextSelection.collapsed(offset: block.content.length);
+    }
 
     Widget content = TextField(
       controller: controller,
+      focusNode: focusNode,
       style: _getTextStyle(block.type),
       decoration: InputDecoration(border: InputBorder.none, hintText: _getPlaceholder(block.type), hintStyle: TextStyle(color: Colors.grey.shade400), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
       maxLines: null,
@@ -239,19 +245,23 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
         if (value.endsWith('/') && value.length == 1) {
           // Show menu when user types "/"
           Future.microtask(() {
-            final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
-            if (renderBox != null && renderBox.hasSize) {
-              final position = renderBox.localToGlobal(Offset.zero);
-              _showMenuForBlock(index, Offset(position.dx + 100, position.dy + 40), isSlashCommand: true);
-              // Clear the "/" character
-              controller.text = '';
-              block.content = '';
-            }
+            // Position menu with fixed offset from left
+            _showMenuForBlock(index, Offset(120, 100 + (index * 50.0).clamp(0, 300)), isSlashCommand: true);
+            // Clear the "/" character
+            controller.text = '';
+            block.content = '';
           });
         }
       },
       onSubmitted: (value) {
         _addBlock(BlockType.paragraph, index);
+        // Focus the next block
+        Future.delayed(Duration(milliseconds: 100), () {
+          final nextBlock = _blocks.length > index + 1 ? _blocks[index + 1] : null;
+          if (nextBlock != null) {
+            _getFocusNode(nextBlock).requestFocus();
+          }
+        });
       },
     );
 
@@ -349,3 +359,230 @@ class EditorBlock {
 
 /// Block types
 enum BlockType { paragraph, heading1, heading2, heading3, bulletList, numberedList, quote, calloutInfo, calloutWarning, calloutError, calloutSuccess, toggle, divider }
+
+/// Interactive block menu list with keyboard navigation and search
+class _BlockMenuList extends StatefulWidget {
+  const _BlockMenuList({required this.menuForBlockIndex, required this.isSlashCommand, required this.onBlockSelected});
+
+  final int menuForBlockIndex;
+  final bool isSlashCommand;
+  final Function(BlockType) onBlockSelected;
+
+  @override
+  State<_BlockMenuList> createState() => _BlockMenuListState();
+}
+
+class _BlockMenuListState extends State<_BlockMenuList> {
+  int _selectedIndex = 0;
+  String _searchQuery = '';
+  final _searchFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchFocus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  List<BlockMenuOption> get _filteredOptions {
+    if (_searchQuery.isEmpty) {
+      return blockMenuOptions;
+    }
+    return blockMenuOptions.where((option) {
+      return option.title.toLowerCase().contains(_searchQuery.toLowerCase()) || option.description.toLowerCase().contains(_searchQuery.toLowerCase()) || option.id.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
+
+  void _selectOption(BlockMenuOption option) {
+    final type = _blockTypeFromMenuOption(option);
+    widget.onBlockSelected(type);
+  }
+
+  BlockType _blockTypeFromMenuOption(BlockMenuOption option) {
+    switch (option.id) {
+      case 'heading1':
+        return BlockType.heading1;
+      case 'heading2':
+        return BlockType.heading2;
+      case 'heading3':
+        return BlockType.heading3;
+      case 'bullet-list':
+        return BlockType.bulletList;
+      case 'numbered-list':
+        return BlockType.numberedList;
+      case 'quote':
+        return BlockType.quote;
+      case 'callout-info':
+        return BlockType.calloutInfo;
+      case 'callout-warning':
+        return BlockType.calloutWarning;
+      case 'callout-error':
+        return BlockType.calloutError;
+      case 'callout-success':
+        return BlockType.calloutSuccess;
+      case 'toggle':
+        return BlockType.toggle;
+      case 'divider':
+        return BlockType.divider;
+      default:
+        return BlockType.paragraph;
+    }
+  }
+
+  void _handleKeyEvent(String char) {
+    setState(() {
+      _searchQuery += char;
+      _selectedIndex = 0; // Reset selection when searching
+    });
+  }
+
+  void _moveSelectionUp() {
+    setState(() {
+      if (_selectedIndex > 0) {
+        _selectedIndex--;
+      }
+    });
+  }
+
+  void _moveSelectionDown() {
+    final options = _filteredOptions;
+    if (_selectedIndex < options.length - 1) {
+      setState(() {
+        _selectedIndex++;
+      });
+    }
+  }
+
+  void _selectCurrent() {
+    final options = _filteredOptions;
+    if (options.isNotEmpty && _selectedIndex < options.length) {
+      _selectOption(options[_selectedIndex]);
+    }
+  }
+
+  void _clearSearch() {
+    setState(() {
+      if (_searchQuery.isNotEmpty) {
+        _searchQuery = _searchQuery.substring(0, _searchQuery.length - 1);
+        _selectedIndex = 0;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final options = _filteredOptions;
+
+    return RawKeyboardListener(
+      focusNode: _searchFocus,
+      autofocus: true,
+      onKey: (event) {
+        if (event is! RawKeyDownEvent) return;
+
+        final key = event.logicalKey;
+
+        if (key == LogicalKeyboardKey.enter) {
+          _selectCurrent();
+        } else if (key == LogicalKeyboardKey.arrowUp) {
+          _moveSelectionUp();
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _moveSelectionDown();
+        } else if (key == LogicalKeyboardKey.backspace) {
+          _clearSearch();
+        } else if (event.character != null && RegExp(r'[a-zA-Z0-9\s]').hasMatch(event.character!)) {
+          _handleKeyEvent(event.character!.toLowerCase());
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Search indicator
+          if (_searchQuery.isNotEmpty)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: Colors.blue.shade50, border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
+              child: Row(children: [Icon(Icons.search, size: 16, color: Colors.blue.shade700), SizedBox(width: 8), Text('Search: $_searchQuery', style: TextStyle(fontSize: 13, color: Colors.blue.shade700, fontWeight: FontWeight.w500))]),
+            ),
+
+          // Options list
+          Flexible(
+            child:
+                options.isEmpty
+                    ? Padding(padding: EdgeInsets.all(24), child: Text('No blocks found for "$_searchQuery"', style: TextStyle(color: Colors.grey.shade600, fontSize: 13), textAlign: TextAlign.center))
+                    : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      itemBuilder: (context, index) {
+                        final option = options[index];
+                        final isSelected = index == _selectedIndex;
+
+                        return InkWell(
+                          onTap: () => _selectOption(option),
+                          onHover: (hovering) {
+                            if (hovering) {
+                              setState(() => _selectedIndex = index);
+                            }
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(color: isSelected ? Colors.blue.shade50 : Colors.transparent),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(color: isSelected ? Colors.blue.shade100 : Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+                                  child: Icon(option.icon, size: 20, color: isSelected ? Colors.blue.shade700 : Colors.grey.shade700),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(option.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isSelected ? Colors.blue.shade700 : Colors.black87)),
+                                      SizedBox(height: 2),
+                                      Text(option.description, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+          ),
+
+          // Keyboard hints
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade200)), color: Colors.grey.shade50),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [_buildKeyHint('↑↓', 'Navigate'), SizedBox(width: 12), _buildKeyHint('Enter', 'Select'), SizedBox(width: 12), _buildKeyHint('Type', 'Search')]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKeyHint(String key, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(4)),
+          child: Text(key, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+        ),
+        SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+      ],
+    );
+  }
+}
