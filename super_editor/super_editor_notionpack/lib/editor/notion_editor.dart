@@ -98,18 +98,8 @@ class _NotionEditorState extends State<NotionEditor> {
   void _saveDocument() {
     if (widget.onSave == null) return;
 
-    print('💾 _saveDocument called');
-    print('   Total blocks: ${_blocks.length}');
-
     // Serialize all blocks to JSON
-    final blocks =
-        _blocks.map((block) {
-          final blockJson = block.toJson();
-          print('   Block "${block.id}": has attributedContent? ${blockJson.containsKey('attributedContent')}');
-          return blockJson;
-        }).toList();
-
-    final documentJson = {'version': '1.0', 'createdAt': DateTime.now().toIso8601String(), 'blocks': blocks};
+    final documentJson = {'version': '1.0', 'createdAt': DateTime.now().toIso8601String(), 'blocks': _blocks.map((block) => block.toJson()).toList()};
 
     widget.onSave!(documentJson);
   }

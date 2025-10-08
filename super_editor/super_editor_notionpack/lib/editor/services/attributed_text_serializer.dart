@@ -6,30 +6,20 @@ import 'package:super_editor/super_editor.dart';
 class AttributedTextSerializer {
   /// Convert AttributedText to JSON
   static Map<String, dynamic> toJson(AttributedText text) {
-    print('🔄 AttributedTextSerializer.toJson called');
-    print('   Text: "${text.text}"');
-
     final attributions = <Map<String, dynamic>>[];
 
     // Get all attribution spans
     final spans = text.spans.collapseSpans(contentLength: text.text.length);
-    print('   Number of spans: ${spans.length}');
 
     for (final span in spans) {
-      print('   Span ${span.start}-${span.end}: ${span.attributions.length} attributions');
       for (final attribution in span.attributions) {
-        print('      Attribution: $attribution');
         final attributionData = _serializeAttribution(attribution, span.start, span.end);
         if (attributionData != null) {
           attributions.add(attributionData);
-          print('      ✅ Serialized: $attributionData');
-        } else {
-          print('      ⚠️ Could not serialize: $attribution');
         }
       }
     }
 
-    print('   Total attributions serialized: ${attributions.length}');
     return {'text': text.text, 'attributions': attributions};
   }
 

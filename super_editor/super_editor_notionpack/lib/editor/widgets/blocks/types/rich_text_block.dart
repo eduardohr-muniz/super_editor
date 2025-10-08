@@ -112,21 +112,11 @@ class _RichTextBlockState extends State<RichTextBlock> {
 
   void _handleTextChange() {
     final newContent = _textController.text.text;
-    final textChanged = newContent != widget.block.content;
-
-    print('📝 _handleTextChange called:');
-    print('   newContent: "$newContent"');
-    print('   textChanged: $textChanged');
 
     // ALWAYS save attributed text (text OR attributions may have changed)
     final attributedJson = AttributedTextSerializer.toJson(_textController.text);
 
-    print('   📊 attributedJson: $attributedJson');
-    print('   📊 Number of attributions: ${attributedJson['attributions']?.length ?? 0}');
-
     widget.onBlockUpdated(widget.block.copyWith(content: newContent, attributedContent: attributedJson));
-
-    print('   ✅ Block updated with attributedContent!');
 
     // Detect slash command
     if (newContent == '/' || (newContent.endsWith('/') && newContent.length == 1)) {
@@ -144,6 +134,10 @@ class _RichTextBlockState extends State<RichTextBlock> {
     // Update content if block changed externally
     if (oldWidget.block.content != widget.block.content && _textController.text.text != widget.block.content) {
       _textController.text = AttributedText(widget.block.content);
+    }
+    // Rebuild if text color changed (forces TextStyle update)
+    if (oldWidget.block.textColor != widget.block.textColor) {
+      setState(() {});
     }
   }
 
@@ -207,8 +201,8 @@ class _RichTextBlockState extends State<RichTextBlock> {
             _buildToolbarButton(icon: Icons.strikethrough_s, tooltip: 'Strikethrough', onPressed: _toggleStrikethrough, isActive: _hasAttribution(strikethroughAttribution)),
             Container(width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 8), color: Colors.grey.shade700),
             _buildToolbarButton(icon: Icons.link, tooltip: 'Add Link', onPressed: _addLink, isActive: _hasLinkAttribution()),
-            const SizedBox(width: 4),
-            _buildColorPicker(),
+            Container(width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 8), color: Colors.grey.shade700),
+            _buildInlineColorPalette(),
           ],
         ),
       ),
@@ -226,28 +220,20 @@ class _RichTextBlockState extends State<RichTextBlock> {
     );
   }
 
-  Widget _buildColorPicker() {
-    return PopupMenuButton<Color>(
-      icon: const Icon(Icons.palette, size: 16, color: Colors.white),
-      tooltip: 'Text Color',
-      offset: const Offset(0, 40),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      itemBuilder:
-          (context) => [
-            _buildColorMenuItem('Black', Colors.black),
-            _buildColorMenuItem('Red', Colors.red),
-            _buildColorMenuItem('Orange', Colors.orange),
-            _buildColorMenuItem('Yellow', Colors.yellow.shade700),
-            _buildColorMenuItem('Green', Colors.green),
-            _buildColorMenuItem('Blue', Colors.blue),
-            _buildColorMenuItem('Purple', Colors.purple),
-          ],
-      onSelected: _applyColor,
-    );
+  Widget _buildInlineColorPalette() {
+    final colors = [Colors.black, Colors.grey.shade600, Colors.red, Colors.orange, Colors.yellow.shade700, Colors.green, Colors.blue, Colors.purple, Colors.pink];
+
+    return Row(mainAxisSize: MainAxisSize.min, children: colors.map((color) => _buildColorCircle(color)).toList());
   }
 
-  PopupMenuEntry<Color> _buildColorMenuItem(String label, Color color) {
-    return PopupMenuItem(value: color, child: Row(children: [Container(width: 16, height: 16, decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300))), const SizedBox(width: 8), Text(label)]));
+  Widget _buildColorCircle(Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Tooltip(
+        message: 'Color',
+        child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: () => _applyColor(color), child: Container(width: 20, height: 20, decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2))))),
+      ),
+    );
   }
 
   void _toggleBold() {
@@ -267,12 +253,8 @@ class _RichTextBlockState extends State<RichTextBlock> {
   }
 
   void _applyColor(Color color) {
-    final selection = _textController.selection;
-    if (!selection.isCollapsed) {
-      final range = SpanRange(selection.start, selection.end - 1);
-      final newText = _textController.text.copy()..addAttribution(ColorAttribution(color), range);
-      _textController.text = newText;
-    }
+    // Update the block's text color (will trigger rebuild with new TextStyle)
+    widget.onBlockUpdated(widget.block.copyWith(textColor: color));
   }
 
   void _addLink() {
@@ -427,12 +409,15 @@ class _RichTextBlockState extends State<RichTextBlock> {
   }
 
   TextStyle _getBaseTextStyle() {
+    // Use block's text color if set, otherwise use default
+    final baseColor = widget.block.textColor ?? Colors.black;
+
     return switch (widget.block.type) {
-      BlockType.heading1 => const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, height: 1.2, color: Colors.black),
-      BlockType.heading2 => const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, height: 1.2, color: Colors.black),
-      BlockType.heading3 => const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, height: 1.2, color: Colors.black),
-      BlockType.quote => TextStyle(fontSize: 16, height: 1.5, fontStyle: FontStyle.italic, color: Colors.grey.shade700),
-      _ => const TextStyle(fontSize: 16, height: 1.5, color: Colors.black),
+      BlockType.heading1 => TextStyle(fontSize: 32, fontWeight: FontWeight.bold, height: 1.2, color: baseColor),
+      BlockType.heading2 => TextStyle(fontSize: 24, fontWeight: FontWeight.bold, height: 1.2, color: baseColor),
+      BlockType.heading3 => TextStyle(fontSize: 18, fontWeight: FontWeight.bold, height: 1.2, color: baseColor),
+      BlockType.quote => TextStyle(fontSize: 16, height: 1.5, fontStyle: FontStyle.italic, color: widget.block.textColor ?? Colors.grey.shade700),
+      _ => TextStyle(fontSize: 16, height: 1.5, color: baseColor),
     };
   }
 }
