@@ -10,6 +10,8 @@ class NotionEditorPage extends StatefulWidget {
 }
 
 class _NotionEditorPageState extends State<NotionEditorPage> {
+  bool _isEditMode = true;
+
   @override
   void initState() {
     super.initState();
@@ -72,11 +74,23 @@ class _NotionEditorPageState extends State<NotionEditorPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            IconButton(icon: Icon(Icons.menu), onPressed: () {}),
+            IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
             const SizedBox(width: 8),
-            Expanded(child: Text('Untitled Document', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
-            IconButton(icon: Icon(Icons.share_outlined), onPressed: () {}),
-            IconButton(icon: Icon(Icons.more_vert), onPressed: () {}),
+            Expanded(child: Text('Untitled Document', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+            // Toggle Edit/View Mode
+            SegmentedButton<bool>(
+              segments: const [ButtonSegment(value: true, icon: Icon(Icons.edit, size: 18), label: Text('Edit')), ButtonSegment(value: false, icon: Icon(Icons.visibility, size: 18), label: Text('View'))],
+              selected: {_isEditMode},
+              onSelectionChanged: (Set<bool> selection) {
+                setState(() {
+                  _isEditMode = selection.first;
+                });
+              },
+              style: ButtonStyle(visualDensity: VisualDensity.compact),
+            ),
+            const SizedBox(width: 16),
+            IconButton(icon: const Icon(Icons.share_outlined), onPressed: () {}),
+            IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
           ],
         ),
       ),
@@ -84,8 +98,6 @@ class _NotionEditorPageState extends State<NotionEditorPage> {
   }
 
   Widget _buildEditor() {
-    return const NotionEditor(
-      isEditable: true, // Change to false for view-only mode
-    );
+    return NotionEditor(isEditable: _isEditMode);
   }
 }
