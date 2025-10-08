@@ -6,13 +6,14 @@ import 'package:super_editor_notionpack/editor/widgets/blocks/types/video_block.
 
 /// Routes to the appropriate block content widget based on block type
 class BlockContent extends StatelessWidget {
-  const BlockContent({super.key, required this.block, required this.index, required this.isEditable, required this.onBlockUpdated, required this.onShowSlashMenu});
+  const BlockContent({super.key, required this.block, required this.index, required this.isEditable, required this.onBlockUpdated, required this.onShowSlashMenu, this.onEnterPressed});
 
   final EditorBlock block;
   final int index;
   final bool isEditable;
   final ValueChanged<EditorBlock> onBlockUpdated;
   final VoidCallback onShowSlashMenu;
+  final VoidCallback? onEnterPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +30,7 @@ class BlockContent extends StatelessWidget {
       // ALL text-based blocks use RichTextBlock with SuperEditor for rich text support
       // (bold, italic, underline, links, colors, etc.)
       default:
-        return _wrapBlockWithDecorations(RichTextBlock(block: block, isEditable: isEditable, onBlockUpdated: onBlockUpdated, onShowSlashMenu: onShowSlashMenu));
+        return _wrapBlockWithDecorations(RichTextBlock(block: block, isEditable: isEditable, onBlockUpdated: onBlockUpdated, onShowSlashMenu: onShowSlashMenu, onEnterPressed: onEnterPressed));
     }
   }
 

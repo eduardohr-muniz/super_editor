@@ -5,20 +5,14 @@ import 'package:super_editor_notionpack/editor/widgets/add_block_button.dart';
 
 /// Reorderable list of blocks
 class BlockList extends StatefulWidget {
-  const BlockList({
-    super.key,
-    required this.blocks,
-    required this.isEditable,
-    required this.onBlockUpdated,
-    required this.onReorder,
-    required this.onShowMenu,
-  });
+  const BlockList({super.key, required this.blocks, required this.isEditable, required this.onBlockUpdated, required this.onReorder, required this.onShowMenu, this.onEnterPressedAtIndex});
 
   final List<EditorBlock> blocks;
   final bool isEditable;
   final Function(int index, EditorBlock block) onBlockUpdated;
   final Function(int oldIndex, int newIndex) onReorder;
   final Function(int index, Offset position, {bool isSlashCommand}) onShowMenu;
+  final Function(int index)? onEnterPressedAtIndex;
 
   @override
   State<BlockList> createState() => _BlockListState();
@@ -39,11 +33,7 @@ class _BlockListState extends State<BlockList> {
               itemCount: widget.blocks.length,
               onReorder: widget.isEditable ? widget.onReorder : (_, __) {},
               proxyDecorator: (child, index, animation) {
-                return Material(
-                  elevation: 6,
-                  borderRadius: BorderRadius.circular(8),
-                  child: child,
-                );
+                return Material(elevation: 6, borderRadius: BorderRadius.circular(8), child: child);
               },
               buildDefaultDragHandles: false,
               itemBuilder: (context, index) {
@@ -62,10 +52,7 @@ class _BlockListState extends State<BlockList> {
                           });
                         },
                         onTap: () {
-                          widget.onShowMenu(
-                            index - 1,
-                            Offset(120, 100 + ((index - 1) * 50.0).clamp(0, 300)),
-                          );
+                          widget.onShowMenu(index - 1, Offset(120, 100 + ((index - 1) * 50.0).clamp(0, 300)));
                         },
                       ),
                     // The block itself
@@ -85,6 +72,9 @@ class _BlockListState extends State<BlockList> {
                       onShowMenu: (position, {isSlashCommand = false}) {
                         widget.onShowMenu(index, position, isSlashCommand: isSlashCommand);
                       },
+                      onEnterPressed: () {
+                        widget.onEnterPressedAtIndex?.call(index);
+                      },
                     ),
                   ],
                 );
@@ -103,10 +93,7 @@ class _BlockListState extends State<BlockList> {
                   });
                 },
                 onTap: () {
-                  widget.onShowMenu(
-                    widget.blocks.length - 1,
-                    Offset(120, 100 + ((widget.blocks.length - 1) * 50.0).clamp(0, 300)),
-                  );
+                  widget.onShowMenu(widget.blocks.length - 1, Offset(120, 100 + ((widget.blocks.length - 1) * 50.0).clamp(0, 300)));
                 },
               ),
             ),
@@ -115,4 +102,3 @@ class _BlockListState extends State<BlockList> {
     );
   }
 }
-

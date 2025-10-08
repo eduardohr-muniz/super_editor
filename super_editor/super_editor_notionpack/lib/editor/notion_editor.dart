@@ -5,12 +5,7 @@ import 'package:super_editor_notionpack/editor/widgets/block_menu_overlay.dart';
 
 /// Main Notion-style editor widget with edit/view modes
 class NotionEditor extends StatefulWidget {
-  const NotionEditor({
-    super.key,
-    this.initialBlocks,
-    this.isEditable = true,
-    this.onBlocksChanged,
-  });
+  const NotionEditor({super.key, this.initialBlocks, this.isEditable = true, this.onBlocksChanged});
 
   final List<EditorBlock>? initialBlocks;
   final bool isEditable;
@@ -34,10 +29,7 @@ class _NotionEditorState extends State<NotionEditor> {
   }
 
   List<EditorBlock> _getDefaultBlocks() {
-    return [
-      EditorBlock(id: '1', type: BlockType.heading1, content: 'Welcome to NotionPack'),
-      EditorBlock(id: '2', type: BlockType.paragraph, content: 'A Notion-style block editor'),
-    ];
+    return [EditorBlock(id: '1', type: BlockType.heading1, content: 'Welcome to NotionPack'), EditorBlock(id: '2', type: BlockType.paragraph, content: 'A Notion-style block editor')];
   }
 
   void _notifyChange() {
@@ -46,14 +38,7 @@ class _NotionEditorState extends State<NotionEditor> {
 
   void _addBlock(BlockType type, int afterIndex) {
     setState(() {
-      _blocks.insert(
-        afterIndex + 1,
-        EditorBlock(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          type: type,
-          content: '',
-        ),
-      );
+      _blocks.insert(afterIndex + 1, EditorBlock(id: DateTime.now().millisecondsSinceEpoch.toString(), type: type, content: ''));
       _notifyChange();
     });
   }
@@ -61,13 +46,7 @@ class _NotionEditorState extends State<NotionEditor> {
   void _convertBlock(int index, BlockType newType) {
     final block = _blocks[index];
     setState(() {
-      _blocks[index] = EditorBlock(
-        id: block.id,
-        type: newType,
-        content: block.content,
-        url: block.url,
-        localPath: block.localPath,
-      );
+      _blocks[index] = EditorBlock(id: block.id, type: newType, content: block.content, url: block.url, localPath: block.localPath);
       _notifyChange();
     });
   }
@@ -90,7 +69,7 @@ class _NotionEditorState extends State<NotionEditor> {
 
   void _showMenuForBlock(int index, Offset position, {bool isSlashCommand = false}) {
     if (!widget.isEditable) return;
-    
+
     setState(() {
       _showBlockMenu = true;
       _blockMenuPosition = position;
@@ -103,17 +82,22 @@ class _NotionEditorState extends State<NotionEditor> {
     setState(() => _showBlockMenu = false);
   }
 
+  void _createNewBlockOnEnter(int currentIndex) {
+    final currentBlock = _blocks[currentIndex];
+
+    setState(() {
+      // Create new block of the same type (empty blocks auto-focus)
+      final newBlock = EditorBlock(id: DateTime.now().millisecondsSinceEpoch.toString(), type: currentBlock.type, content: '');
+      _blocks.insert(currentIndex + 1, newBlock);
+      _notifyChange();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        BlockList(
-          blocks: _blocks,
-          isEditable: widget.isEditable,
-          onBlockUpdated: _updateBlock,
-          onReorder: _reorderBlocks,
-          onShowMenu: _showMenuForBlock,
-        ),
+        BlockList(blocks: _blocks, isEditable: widget.isEditable, onBlockUpdated: _updateBlock, onReorder: _reorderBlocks, onShowMenu: _showMenuForBlock, onEnterPressedAtIndex: _createNewBlockOnEnter),
         if (_showBlockMenu && _menuForBlockIndex != null && widget.isEditable)
           BlockMenuOverlay(
             position: _blockMenuPosition,
@@ -132,4 +116,3 @@ class _NotionEditorState extends State<NotionEditor> {
     );
   }
 }
-

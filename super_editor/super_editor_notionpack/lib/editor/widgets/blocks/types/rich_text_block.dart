@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_notionpack/editor/models/editor_block.dart';
 
-/// Rich text block using SuperTextField for single-line Notion-style editing
+/// Rich text block using SuperTextField for Notion-style editing
 /// Supports bold, italic, underline, strikethrough, colors, links, etc.
-/// Each block is a single line - Enter creates a new block
+/// Enter key creates a new block below
 class RichTextBlock extends StatefulWidget {
-  const RichTextBlock({super.key, required this.block, required this.isEditable, required this.onBlockUpdated, required this.onShowSlashMenu});
+  const RichTextBlock({super.key, required this.block, required this.isEditable, required this.onBlockUpdated, required this.onShowSlashMenu, this.onEnterPressed});
 
   final EditorBlock block;
   final bool isEditable;
   final ValueChanged<EditorBlock> onBlockUpdated;
   final VoidCallback onShowSlashMenu;
+  final VoidCallback? onEnterPressed;
 
   @override
   State<RichTextBlock> createState() => _RichTextBlockState();
@@ -27,6 +29,32 @@ class _RichTextBlockState extends State<RichTextBlock> {
     _textController = AttributedTextEditingController(text: AttributedText(widget.block.content));
     _focusNode = FocusNode();
     _textController.addListener(_handleTextChange);
+
+    // Auto-focus if this is a new empty block
+    if (widget.block.content.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _focusNode.requestFocus();
+        }
+      });
+    }
+  }
+
+  /// Custom keyboard handler that intercepts Enter key to create new blocks
+  TextFieldKeyboardHandlerResult _handleEnterKey({required SuperTextFieldContext textFieldContext, required KeyEvent keyEvent}) {
+    if (keyEvent is! KeyDownEvent && keyEvent is! KeyRepeatEvent) {
+      return TextFieldKeyboardHandlerResult.notHandled;
+    }
+
+    if (keyEvent.logicalKey != LogicalKeyboardKey.enter && keyEvent.logicalKey != LogicalKeyboardKey.numpadEnter) {
+      return TextFieldKeyboardHandlerResult.notHandled;
+    }
+
+    // Create new block below
+    widget.onEnterPressed?.call();
+
+    // Return handled to prevent Enter from inserting a newline
+    return TextFieldKeyboardHandlerResult.handled;
   }
 
   void _handleTextChange() {
@@ -81,10 +109,9 @@ class _RichTextBlockState extends State<RichTextBlock> {
         padding: EdgeInsets.symmetric(vertical: _getVerticalPadding(), horizontal: 4),
         selectionColor: Colors.blue.withOpacity(0.3),
         hintBehavior: HintBehavior.displayHintUntilFocus,
-        maxLines: null,
-        minLines: 1,
-
         hintBuilder: (context) => Text(_getPlaceholder(), style: TextStyle(color: Colors.grey.shade400)),
+        // Custom keyboard handler to intercept Enter key
+        keyboardHandlers: [_handleEnterKey, ...defaultTextFieldKeyboardHandlers.where((handler) => handler != DefaultSuperTextFieldKeyboardHandlers.insertNewlineWhenEnterIsPressed)],
       ),
     );
   }

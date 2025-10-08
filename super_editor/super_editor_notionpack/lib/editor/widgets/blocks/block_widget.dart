@@ -5,16 +5,7 @@ import 'package:super_editor_notionpack/editor/widgets/blocks/block_controls.dar
 
 /// Wrapper for a single block with controls
 class BlockWidget extends StatelessWidget {
-  const BlockWidget({
-    super.key,
-    required this.block,
-    required this.index,
-    required this.isEditable,
-    required this.isHovered,
-    required this.onHoverChanged,
-    required this.onBlockUpdated,
-    required this.onShowMenu,
-  });
+  const BlockWidget({super.key, required this.block, required this.index, required this.isEditable, required this.isHovered, required this.onHoverChanged, required this.onBlockUpdated, required this.onShowMenu, this.onEnterPressed});
 
   final EditorBlock block;
   final int index;
@@ -23,6 +14,7 @@ class BlockWidget extends StatelessWidget {
   final ValueChanged<bool> onHoverChanged;
   final ValueChanged<EditorBlock> onBlockUpdated;
   final Function(Offset position, {bool isSlashCommand}) onShowMenu;
+  final VoidCallback? onEnterPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -51,11 +43,9 @@ class BlockWidget extends StatelessWidget {
                 isEditable: isEditable,
                 onBlockUpdated: onBlockUpdated,
                 onShowSlashMenu: () {
-                  onShowMenu(
-                    Offset(120, 100 + (index * 50.0).clamp(0, 300)),
-                    isSlashCommand: true,
-                  );
+                  onShowMenu(Offset(120, 100 + (index * 50.0).clamp(0, 300)), isSlashCommand: true);
                 },
+                onEnterPressed: onEnterPressed,
               ),
             ),
           ],
@@ -64,4 +54,3 @@ class BlockWidget extends StatelessWidget {
     );
   }
 }
-
