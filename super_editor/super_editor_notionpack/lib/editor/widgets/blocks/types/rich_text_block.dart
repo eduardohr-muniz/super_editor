@@ -295,6 +295,7 @@ class _RichTextBlockState extends State<RichTextBlock> {
     // Show dialog to ask for URL
     showDialog(
       context: context,
+      barrierColor: Colors.transparent,
       builder:
           (context) => _LinkDialog(
             onLinkAdded: (url) {
@@ -511,32 +512,54 @@ class _LinkDialogState extends State<_LinkDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add Link'),
-      content: TextField(
-        controller: _urlController,
-        autofocus: true,
-        decoration: const InputDecoration(hintText: 'https://example.com', labelText: 'URL', border: OutlineInputBorder()),
-        onSubmitted: (value) {
-          if (value.isNotEmpty) {
-            widget.onLinkAdded(value);
-            Navigator.of(context).pop();
-          }
-        },
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: () {
-            final url = _urlController.text.trim();
-            if (url.isNotEmpty) {
-              widget.onLinkAdded(url);
-              Navigator.of(context).pop();
-            }
-          },
-          child: const Text('Add Link'),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        decoration: BoxDecoration(color: Colors.grey.shade900, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))]),
+        child: Row(
+          spacing: 12,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _urlController,
+                autofocus: true,
+
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Paste link or type URL',
+                  prefixIcon: Icon(Icons.link, color: Colors.blue, size: 20),
+                  isDense: true,
+                  hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                  filled: true,
+
+                  fillColor: Colors.grey.shade800,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                onSubmitted: (value) {
+                  if (value.isNotEmpty) {
+                    widget.onLinkAdded(value);
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+            ),
+
+            IconButton(
+              icon: const Icon(Icons.add, color: Colors.blue),
+              onPressed: () {
+                final url = _urlController.text.trim();
+                if (url.isNotEmpty) {
+                  widget.onLinkAdded(url);
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
