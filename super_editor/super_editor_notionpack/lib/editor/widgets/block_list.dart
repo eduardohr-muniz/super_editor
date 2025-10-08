@@ -72,6 +72,7 @@ class _BlockListState extends State<BlockList> {
                       onShowMenu: (position, {isSlashCommand = false}) {
                         widget.onShowMenu(index, position, isSlashCommand: isSlashCommand);
                       },
+                      allBlocks: widget.blocks,
                       onEnterPressed: () {
                         widget.onEnterPressedAtIndex?.call(index);
                       },

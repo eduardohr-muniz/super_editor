@@ -6,13 +6,14 @@ import 'package:super_editor_notionpack/editor/widgets/blocks/types/video_block.
 
 /// Routes to the appropriate block content widget based on block type
 class BlockContent extends StatelessWidget {
-  const BlockContent({super.key, required this.block, required this.index, required this.isEditable, required this.onBlockUpdated, required this.onShowSlashMenu, this.onEnterPressed});
+  const BlockContent({super.key, required this.block, required this.index, required this.isEditable, required this.onBlockUpdated, required this.onShowSlashMenu, this.allBlocks, this.onEnterPressed});
 
   final EditorBlock block;
   final int index;
   final bool isEditable;
   final ValueChanged<EditorBlock> onBlockUpdated;
   final VoidCallback onShowSlashMenu;
+  final List<EditorBlock>? allBlocks;
   final VoidCallback? onEnterPressed;
 
   @override
@@ -46,7 +47,8 @@ class BlockContent extends StatelessWidget {
         return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: const EdgeInsets.only(top: 12, right: 8), child: Icon(Icons.circle, size: 6, color: Colors.grey.shade700)), Expanded(child: content)]);
 
       case BlockType.numberedList:
-        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: const EdgeInsets.only(top: 8, right: 8), child: SizedBox(width: 24, child: Text('${index + 1}.', style: const TextStyle(fontSize: 14)))), Expanded(child: content)]);
+        final listNumber = _calculateNumberedListNumber();
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: const EdgeInsets.only(top: 8, right: 8), child: SizedBox(width: 24, child: Text('$listNumber.', style: const TextStyle(fontSize: 14)))), Expanded(child: content)]);
 
       // Callout blocks - add colored background and icon
       case BlockType.calloutInfo:
@@ -106,5 +108,29 @@ class BlockContent extends StatelessWidget {
       BlockType.calloutSuccess => Colors.green,
       _ => Colors.grey,
     };
+  }
+
+  /// Calculates the correct number for a numbered list item by checking previous blocks
+  int _calculateNumberedListNumber() {
+    if (allBlocks == null || index <= 0) {
+      return 1;
+    }
+
+    int currentNumber = 1;
+
+    // Look backwards through previous blocks
+    for (int i = index - 1; i >= 0; i--) {
+      final previousBlock = allBlocks![i];
+
+      if (previousBlock.type == BlockType.numberedList) {
+        // Found a numbered list - increment and continue looking back
+        currentNumber++;
+      } else {
+        // Found a non-numbered list block - stop here
+        break;
+      }
+    }
+
+    return currentNumber;
   }
 }
