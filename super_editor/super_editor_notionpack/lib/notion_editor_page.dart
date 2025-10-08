@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:super_editor_notionpack/notion_block_editor.dart';
+import 'package:super_editor_notionpack/editor/notion_editor.dart';
 
 /// Main page with Notion-like editor
 class NotionEditorPage extends StatefulWidget {
@@ -84,6 +84,8 @@ class _NotionEditorPageState extends State<NotionEditorPage> {
   }
 
   Widget _buildEditor() {
-    return const NotionBlockEditor();
+    return const NotionEditor(
+      isEditable: true, // Change to false for view-only mode
+    );
   }
 }
