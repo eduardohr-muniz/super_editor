@@ -175,6 +175,8 @@ final blockMenuOptions = <BlockMenuOption>[
   BlockMenuOption(id: 'callout-success', title: 'Callout - Success', description: 'Show success message', icon: Icons.check_circle_outline, createNode: (id) => CalloutNode(id: id, text: AttributedText(''), calloutType: CalloutType.success)),
   BlockMenuOption(id: 'toggle', title: 'Toggle', description: 'Expandable block', icon: Icons.expand_more, createNode: (id) => ToggleNode(id: id, text: AttributedText(''), isExpanded: true)),
   BlockMenuOption(id: 'divider', title: 'Divider', description: 'Horizontal line', icon: Icons.horizontal_rule, createNode: (id) => HorizontalRuleNode(id: id)),
+  BlockMenuOption(id: 'image', title: 'Image', description: 'Embed an image from URL', icon: Icons.image_outlined, createNode: (id) => ParagraphNode(id: id, text: AttributedText(''))),
+  BlockMenuOption(id: 'video', title: 'Video', description: 'Embed a YouTube video', icon: Icons.video_library_outlined, createNode: (id) => ParagraphNode(id: id, text: AttributedText(''))),
 ];
 
 /// Insert a block at the current cursor position

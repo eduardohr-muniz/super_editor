@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:super_editor_notionpack/widgets/block_menu.dart';
 
 /// A true Notion-style block editor with reorderable blocks
@@ -21,6 +24,7 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
   // Controllers and focus nodes for each block
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, FocusNode> _focusNodes = {};
+  final Map<String, TextEditingController> _urlControllers = {};
 
   @override
   void initState() {
@@ -32,6 +36,9 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
   void dispose() {
     // Dispose all controllers and focus nodes
     for (var controller in _controllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _urlControllers.values) {
       controller.dispose();
     }
     for (var focusNode in _focusNodes.values) {
@@ -52,6 +59,13 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
       _focusNodes[block.id] = FocusNode();
     }
     return _focusNodes[block.id]!;
+  }
+
+  TextEditingController _getUrlController(EditorBlock block) {
+    if (!_urlControllers.containsKey(block.id)) {
+      _urlControllers[block.id] = TextEditingController(text: block.url ?? '');
+    }
+    return _urlControllers[block.id]!;
   }
 
   void _initializeBlocks() {
@@ -75,7 +89,7 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
   void _convertBlock(int index, BlockType newType) {
     final block = _blocks[index];
     setState(() {
-      _blocks[index] = EditorBlock(id: block.id, type: newType, content: block.content);
+      _blocks[index] = EditorBlock(id: block.id, type: newType, content: block.content, url: block.url);
     });
 
     // Focus the block after conversion
@@ -99,24 +113,41 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
       children: [
         Container(
           color: Colors.white,
-          child: ReorderableListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 40),
-            itemCount: _blocks.length,
-            onReorder: (oldIndex, newIndex) {
-              setState(() {
-                if (newIndex > oldIndex) newIndex--;
-                final block = _blocks.removeAt(oldIndex);
-                _blocks.insert(newIndex, block);
-              });
-            },
-            proxyDecorator: (child, index, animation) {
-              return Material(elevation: 6, borderRadius: BorderRadius.circular(8), child: child);
-            },
-            buildDefaultDragHandles: false,
-            itemBuilder: (context, index) {
-              final block = _blocks[index];
-              return _buildBlock(context, block, index);
-            },
+          child: Column(
+            children: [
+              Expanded(
+                child: ReorderableListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 40),
+                  itemCount: _blocks.length,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (newIndex > oldIndex) newIndex--;
+                      final block = _blocks.removeAt(oldIndex);
+                      _blocks.insert(newIndex, block);
+                    });
+                  },
+                  proxyDecorator: (child, index, animation) {
+                    return Material(elevation: 6, borderRadius: BorderRadius.circular(8), child: child);
+                  },
+                  buildDefaultDragHandles: false,
+                  itemBuilder: (context, index) {
+                    final block = _blocks[index];
+                    return Column(
+                      key: ValueKey(block.id),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Add button between blocks
+                        if (index > 0) _buildBetweenBlocksButton(index - 1),
+                        // The block itself
+                        _buildBlock(context, block, index),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              // Add button at the end
+              Padding(padding: EdgeInsets.symmetric(horizontal: 100), child: _buildBetweenBlocksButton(_blocks.length - 1, isEnd: true)),
+            ],
           ),
         ),
         if (_showBlockMenu && _menuForBlockIndex != null)
@@ -176,6 +207,38 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
     );
   }
 
+  Widget _buildBetweenBlocksButton(int afterIndex, {bool isEnd = false}) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hoveredBlockIndex = afterIndex + 1000),
+      onExit:
+          (_) => setState(() {
+            if (_hoveredBlockIndex == afterIndex + 1000) {
+              _hoveredBlockIndex = null;
+            }
+          }),
+      child: Center(
+        child: AnimatedOpacity(
+          opacity: _hoveredBlockIndex == afterIndex + 1000 ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 150),
+          child: Container(
+            margin: EdgeInsets.symmetric(vertical: 2),
+            child: InkWell(
+              onTap: () {
+                _showMenuForBlock(afterIndex, Offset(120, 100 + (afterIndex * 50.0).clamp(0, 300)));
+              },
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: Colors.grey.shade100, border: Border.all(color: Colors.grey.shade300, width: 1), borderRadius: BorderRadius.circular(4)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add, size: 12, color: Colors.grey.shade600), SizedBox(width: 4), Text('Add block', style: TextStyle(fontSize: 10, color: Colors.grey.shade600))]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBlock(BuildContext context, EditorBlock block, int index) {
     return MouseRegion(
       key: ValueKey(block.id),
@@ -225,6 +288,7 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
   Widget _buildBlockContent(EditorBlock block, int index) {
     final controller = _getController(block);
     final focusNode = _getFocusNode(block);
+    final urlController = _getUrlController(block);
 
     // Update controller if block content changed externally
     if (controller.text != block.content) {
@@ -232,38 +296,65 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
       controller.selection = TextSelection.collapsed(offset: block.content.length);
     }
 
-    Widget content = TextField(
-      controller: controller,
-      focusNode: focusNode,
-      style: _getTextStyle(block.type),
-      decoration: InputDecoration(border: InputBorder.none, hintText: _getPlaceholder(block.type), hintStyle: TextStyle(color: Colors.grey.shade400), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
-      maxLines: null,
-      onChanged: (value) {
-        block.content = value;
+    // Update URL controller if URL changed externally
+    if (urlController.text != (block.url ?? '')) {
+      urlController.text = block.url ?? '';
+      urlController.selection = TextSelection.collapsed(offset: urlController.text.length);
+    }
 
-        // Detect slash command
-        if (value.endsWith('/') && value.length == 1) {
-          // Show menu when user types "/"
-          Future.microtask(() {
-            // Position menu with fixed offset from left
-            _showMenuForBlock(index, Offset(120, 100 + (index * 50.0).clamp(0, 300)), isSlashCommand: true);
-            // Clear the "/" character
-            controller.text = '';
-            block.content = '';
+    Widget content;
+
+    // For image and video blocks, use URL field
+    if (block.type == BlockType.image || block.type == BlockType.video) {
+      content = TextField(
+        controller: urlController,
+        focusNode: focusNode,
+        autofocus: true,
+        style: TextStyle(fontSize: 14),
+        decoration: InputDecoration(border: InputBorder.none, hintText: block.type == BlockType.image ? 'Paste image URL...' : 'Paste YouTube URL...', hintStyle: TextStyle(color: Colors.grey.shade400), contentPadding: EdgeInsets.zero),
+        onChanged: (value) {
+          setState(() {
+            block.url = value;
+            if (block.type == BlockType.image) {
+              block.localPath = null; // Clear local path when using URL
+            }
           });
-        }
-      },
-      onSubmitted: (value) {
-        _addBlock(BlockType.paragraph, index);
-        // Focus the next block
-        Future.delayed(Duration(milliseconds: 100), () {
-          final nextBlock = _blocks.length > index + 1 ? _blocks[index + 1] : null;
-          if (nextBlock != null) {
-            _getFocusNode(nextBlock).requestFocus();
+        },
+      );
+    } else {
+      content = TextField(
+        controller: controller,
+        focusNode: focusNode,
+        style: _getTextStyle(block.type),
+        decoration: InputDecoration(border: InputBorder.none, hintText: _getPlaceholder(block.type), hintStyle: TextStyle(color: Colors.grey.shade400), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+        maxLines: null,
+        onChanged: (value) {
+          block.content = value;
+
+          // Detect slash command
+          if (value.endsWith('/') && value.length == 1) {
+            // Show menu when user types "/"
+            Future.microtask(() {
+              // Position menu with fixed offset from left
+              _showMenuForBlock(index, Offset(120, 100 + (index * 50.0).clamp(0, 300)), isSlashCommand: true);
+              // Clear the "/" character
+              controller.text = '';
+              block.content = '';
+            });
           }
-        });
-      },
-    );
+        },
+        onSubmitted: (value) {
+          _addBlock(BlockType.paragraph, index);
+          // Focus the next block
+          Future.delayed(Duration(milliseconds: 100), () {
+            final nextBlock = _blocks.length > index + 1 ? _blocks[index + 1] : null;
+            if (nextBlock != null) {
+              _getFocusNode(nextBlock).requestFocus();
+            }
+          });
+        },
+      );
+    }
 
     // Wrap with decorations based on block type
     switch (block.type) {
@@ -312,9 +403,191 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
         return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: EdgeInsets.only(top: 8, right: 8), child: Text('${index + 1}.', style: TextStyle(fontSize: 14))), Expanded(child: content)]);
       case BlockType.divider:
         return Divider(thickness: 1);
+      case BlockType.image:
+        return _buildImageBlock(block, content);
+      case BlockType.video:
+        return _buildVideoBlock(block, content);
       default:
         return content;
     }
+  }
+
+  Widget _buildImageBlock(EditorBlock block, Widget urlField) {
+    final hasImage = (block.url != null && block.url!.isNotEmpty) || (block.localPath != null && block.localPath!.isNotEmpty);
+
+    return Container(
+      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasImage)
+            ClipRRect(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+              child:
+                  block.localPath != null && block.localPath!.isNotEmpty
+                      ? Image.file(
+                        File(block.localPath!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            color: Colors.grey.shade100,
+                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.broken_image, size: 48, color: Colors.grey.shade400), SizedBox(height: 8), Text('Failed to load image', style: TextStyle(color: Colors.grey.shade600))]),
+                          );
+                        },
+                      )
+                      : Image.network(
+                        block.url!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            color: Colors.grey.shade100,
+                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.broken_image, size: 48, color: Colors.grey.shade400), SizedBox(height: 8), Text('Failed to load image', style: TextStyle(color: Colors.grey.shade600))]),
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(height: 200, color: Colors.grey.shade100, child: Center(child: CircularProgressIndicator(value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null)));
+                        },
+                      ),
+            )
+          else
+            Container(
+              height: 200,
+              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.vertical(top: Radius.circular(8))),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade400), SizedBox(height: 8), Text('Choose from gallery or paste URL', style: TextStyle(color: Colors.grey.shade600))]),
+            ),
+          Padding(
+            padding: EdgeInsets.all(12),
+            child: Column(
+              children: [
+                // Gallery button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final picker = ImagePicker();
+                      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+                      if (image != null) {
+                        setState(() {
+                          block.localPath = image.path;
+                          block.url = null;
+                        });
+                      }
+                    },
+                    icon: Icon(Icons.photo_library, size: 18),
+                    label: Text('Choose from Gallery', style: TextStyle(fontSize: 14)),
+                    style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+                  ),
+                ),
+                SizedBox(height: 12),
+                Divider(height: 1),
+                SizedBox(height: 12),
+                // URL field
+                Row(children: [Icon(Icons.link, size: 16, color: Colors.grey.shade600), SizedBox(width: 8), Expanded(child: urlField)]),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoBlock(EditorBlock block, Widget urlField) {
+    String? videoId;
+    String? videoUrl;
+
+    if (block.url != null && block.url!.isNotEmpty) {
+      videoUrl = block.url!;
+      // Extract YouTube video ID from URL - support multiple formats
+      final patterns = [r'youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})', r'youtu\.be/([a-zA-Z0-9_-]{11})', r'youtube\.com/embed/([a-zA-Z0-9_-]{11})', r'youtube\.com/shorts/([a-zA-Z0-9_-]{11})'];
+
+      for (final pattern in patterns) {
+        final regex = RegExp(pattern);
+        final match = regex.firstMatch(block.url!);
+        if (match != null) {
+          videoId = match.group(1);
+          break;
+        }
+      }
+
+      print('YouTube URL: ${block.url}');
+      print('Extracted Video ID: $videoId');
+    }
+
+    return Container(
+      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (videoId != null)
+            InkWell(
+              onTap: () async {
+                // Open YouTube video when clicked
+                if (videoUrl != null) {
+                  final uri = Uri.parse(videoUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                }
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        'https://img.youtube.com/vi/$videoId/maxresdefault.jpg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Image.network('https://img.youtube.com/vi/$videoId/hqdefault.jpg', fit: BoxFit.cover);
+                        },
+                      ),
+                      Container(
+                        color: Colors.black.withOpacity(0.3),
+                        child: Center(
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Container(width: 72, height: 72, decoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8, spreadRadius: 2)]), child: Icon(Icons.play_arrow, size: 42, color: Colors.white)),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 12,
+                        right: 12,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(4)),
+                          child: Text('Click to watch on YouTube', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              height: 200,
+              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.vertical(top: Radius.circular(8))),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.play_circle_outline, size: 48, color: Colors.grey.shade400),
+                  SizedBox(height: 8),
+                  Text('Add YouTube URL below', style: TextStyle(color: Colors.grey.shade600)),
+                  SizedBox(height: 4),
+                  Text('e.g., https://youtube.com/watch?v=...', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                ],
+              ),
+            ),
+          Padding(padding: EdgeInsets.all(12), child: Row(children: [Icon(Icons.link, size: 16, color: Colors.grey.shade600), SizedBox(width: 8), Expanded(child: urlField)])),
+        ],
+      ),
+    );
   }
 
   TextStyle _getTextStyle(BlockType type) {
@@ -350,15 +623,17 @@ class _NotionBlockEditorState extends State<NotionBlockEditor> {
 
 /// Editor block model
 class EditorBlock {
-  EditorBlock({required this.id, required this.type, required this.content});
+  EditorBlock({required this.id, required this.type, required this.content, this.url, this.localPath});
 
   final String id;
   final BlockType type;
   String content;
+  String? url; // For image URL and video blocks
+  String? localPath; // For local image from gallery
 }
 
 /// Block types
-enum BlockType { paragraph, heading1, heading2, heading3, bulletList, numberedList, quote, calloutInfo, calloutWarning, calloutError, calloutSuccess, toggle, divider }
+enum BlockType { paragraph, heading1, heading2, heading3, bulletList, numberedList, quote, calloutInfo, calloutWarning, calloutError, calloutSuccess, toggle, divider, image, video }
 
 /// Interactive block menu list with keyboard navigation and search
 class _BlockMenuList extends StatefulWidget {
@@ -429,6 +704,10 @@ class _BlockMenuListState extends State<_BlockMenuList> {
         return BlockType.toggle;
       case 'divider':
         return BlockType.divider;
+      case 'image':
+        return BlockType.image;
+      case 'video':
+        return BlockType.video;
       default:
         return BlockType.paragraph;
     }

@@ -35,6 +35,12 @@ dependencies:
   super_editor:
     path: ../
 
+  # URL launcher for opening YouTube videos
+  url_launcher: ^6.3.2
+
+  # Image picker for gallery
+  image_picker: ^1.1.2
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
