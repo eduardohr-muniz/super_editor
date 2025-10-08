@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:super_editor_notionpack/editor/notion_editor.dart';
 
@@ -11,10 +12,31 @@ class NotionEditorPage extends StatefulWidget {
 
 class _NotionEditorPageState extends State<NotionEditorPage> {
   bool _isEditMode = true;
+  String _saveStatus = '';
 
   @override
   void initState() {
     super.initState();
+  }
+
+  void _handleSave(Map<String, dynamic> documentJson) {
+    // Convert to JSON string
+    final jsonString = JsonEncoder.withIndent('  ').convert(documentJson);
+
+    // Print to console for now (in production, send to database)
+    print('💾 SAVING DOCUMENT:');
+    print(jsonString);
+
+    setState(() {
+      _saveStatus = 'Saved at ${DateTime.now().toString().substring(11, 19)}';
+    });
+
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Document saved! ${documentJson['blocks'].length} blocks'), duration: const Duration(seconds: 2), backgroundColor: Colors.green.shade700));
+
+    // TODO: In production, send to your database:
+    // await api.saveDocument(documentJson);
+    // await database.insert('documents', documentJson);
   }
 
   @override
@@ -76,7 +98,13 @@ class _NotionEditorPageState extends State<NotionEditorPage> {
           children: [
             IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
             const SizedBox(width: 8),
-            Expanded(child: Text('Untitled Document', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [const Text('Untitled Document', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)), if (_saveStatus.isNotEmpty) Text(_saveStatus, style: TextStyle(fontSize: 11, color: Colors.grey.shade600))],
+              ),
+            ),
             // Toggle Edit/View Mode
             SegmentedButton<bool>(
               segments: const [ButtonSegment(value: true, icon: Icon(Icons.edit, size: 18), label: Text('Edit')), ButtonSegment(value: false, icon: Icon(Icons.visibility, size: 18), label: Text('View'))],
@@ -98,6 +126,6 @@ class _NotionEditorPageState extends State<NotionEditorPage> {
   }
 
   Widget _buildEditor() {
-    return NotionEditor(isEditable: _isEditMode);
+    return NotionEditor(isEditable: _isEditMode, onSave: _handleSave);
   }
 }

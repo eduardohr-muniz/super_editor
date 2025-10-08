@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:super_editor/super_editor.dart';
 import 'package:super_editor_notionpack/editor/models/editor_block.dart';
+import 'package:super_editor_notionpack/editor/services/attributed_text_serializer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Rich text block using SuperTextField for Notion-style editing
@@ -32,7 +33,11 @@ class _RichTextBlockState extends State<RichTextBlock> {
   @override
   void initState() {
     super.initState();
-    _textController = AttributedTextEditingController(text: AttributedText(widget.block.content));
+
+    // Load AttributedText from saved data or create new
+    final initialText = widget.block.attributedContent != null ? AttributedTextSerializer.fromJson(widget.block.attributedContent!) : AttributedText(widget.block.content);
+
+    _textController = AttributedTextEditingController(text: initialText);
     _focusNode = FocusNode();
     _textController.addListener(_handleTextChange);
     _textController.addListener(_handleSelectionChange);
@@ -107,9 +112,21 @@ class _RichTextBlockState extends State<RichTextBlock> {
 
   void _handleTextChange() {
     final newContent = _textController.text.text;
-    if (newContent != widget.block.content) {
-      widget.onBlockUpdated(widget.block.copyWith(content: newContent));
-    }
+    final textChanged = newContent != widget.block.content;
+
+    print('📝 _handleTextChange called:');
+    print('   newContent: "$newContent"');
+    print('   textChanged: $textChanged');
+
+    // ALWAYS save attributed text (text OR attributions may have changed)
+    final attributedJson = AttributedTextSerializer.toJson(_textController.text);
+
+    print('   📊 attributedJson: $attributedJson');
+    print('   📊 Number of attributions: ${attributedJson['attributions']?.length ?? 0}');
+
+    widget.onBlockUpdated(widget.block.copyWith(content: newContent, attributedContent: attributedJson));
+
+    print('   ✅ Block updated with attributedContent!');
 
     // Detect slash command
     if (newContent == '/' || (newContent.endsWith('/') && newContent.length == 1)) {
